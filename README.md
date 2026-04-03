@@ -20,25 +20,9 @@ A Flask application for managing lab progress and commitments using Flask + SQLi
    pip install -r requirements.txt
    ```
 
-## Setup Database
-
-Create the database and admin user:
-
-```python
-from app import app, db
-with app.app_context():
-    db.create_all()
-
-from models import User
-with app.app_context():
-    if not User.query.filter_by(username='admin').first():
-        u = User(username='admin', role='admin')
-        u.set_password('admin123')
-        db.session.add(u)
-        db.session.commit()
-```
-
 ## Running the Application
+
+The database and default admin user will be created automatically on first run.
 
 Set environment variables and run:
 
