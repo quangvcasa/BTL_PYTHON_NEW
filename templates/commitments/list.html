@@ -7,7 +7,7 @@
         <i class="fas fa-handshake me-3"></i>Danh sách Cam kết
     </h1>
     {% if current_user.is_admin() %}
-    <a href="{{ url_for('commitments_create') }}" class="btn btn-primary">
+    <a href="{{ url_for('commitments.commitments_create') }}" class="btn btn-primary">
         <i class="fas fa-plus me-2"></i>Thêm Cam kết mới
     </a>
     {% endif %}
@@ -77,7 +77,7 @@
                     <tr>
                         <td>{{ loop.index }}</td>
                         <td>
-                            <a href="{{ url_for('commitments_detail', commitment_id=commit.id) }}">
+                            <a href="{{ url_for('commitments.commitments_detail', commitment_id=commit.id) }}">
                                 {{ commit.title }}
                             </a>
                         </td>
@@ -117,16 +117,16 @@
                             {% endif %}
                         </td>
                         <td>
-                            <a href="{{ url_for('commitments_detail', commitment_id=commit.id) }}"
+                            <a href="{{ url_for('commitments.commitments_detail', commitment_id=commit.id) }}"
                                class="btn btn-sm btn-outline-info">
                                 <i class="fas fa-eye"></i>
                             </a>
-                            <a href="{{ url_for('progress_update', commitment_id=commit.id) }}"
+                            <a href="{{ url_for('commitments.progress_update', commitment_id=commit.id) }}"
                                class="btn btn-sm btn-outline-success">
                                 <i class="fas fa-edit"></i>
                             </a>
                             {% if current_user.is_admin() %}
-                            <a href="{{ url_for('commitments_edit', commitment_id=commit.id) }}"
+                            <a href="{{ url_for('commitments.commitments_edit', commitment_id=commit.id) }}"
                                class="btn btn-sm btn-warning">
                                 <i class="fas fa-cog"></i>
                             </a>

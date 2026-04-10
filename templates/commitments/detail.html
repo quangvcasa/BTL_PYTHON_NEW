@@ -4,7 +4,7 @@
 {% block content %}
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{{ url_for('commitments_list') }}">Cam kết</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('commitments.commitments_list') }}">Cam kết</a></li>
         <li class="breadcrumb-item active">Chi tiết</li>
     </ol>
 </nav>
@@ -74,12 +74,12 @@
                 </div>
             </div>
             <div class="card-footer">
-                <a href="{{ url_for('progress_update', commitment_id=commitment.id) }}"
+                <a href="{{ url_for('commitments.progress_update', commitment_id=commitment.id) }}"
                    class="btn btn-success">
                     <i class="fas fa-edit me-2"></i>Cập nhật tiến độ
                 </a>
                 {% if current_user.is_admin() %}
-                <a href="{{ url_for('commitments_edit', commitment_id=commitment.id) }}"
+                <a href="{{ url_for('commitments.commitments_edit', commitment_id=commitment.id) }}"
                    class="btn btn-warning">
                     <i class="fas fa-cog me-2"></i>Chỉnh sửa
                 </a>
@@ -110,7 +110,7 @@
                             </small>
                             {% if update.attachment %}
                             <div class="mt-2">
-                                <a href="{{ url_for('download_file', filename=update.attachment) }}"
+                                <a href="{{ url_for('main.download_file', filename=update.attachment) }}"
                                    class="btn btn-outline-secondary btn-sm"
                                    title="Tải xuống tệp đính kèm">
                                     <i class="fas fa-paperclip me-1"></i>{{ update.attachment.split('_', 1)[1] if '_' in update.attachment else update.attachment }}

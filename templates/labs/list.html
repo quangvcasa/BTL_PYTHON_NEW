@@ -6,7 +6,7 @@
     <h1 class="page-title">
         <i class="fas fa-flask me-3"></i>Quản lý Labs
     </h1>
-    <a href="{{ url_for('labs_create') }}" class="btn btn-primary">
+    <a href="{{ url_for('labs.labs_create') }}" class="btn btn-primary">
         <i class="fas fa-plus me-2"></i>Thêm Lab mới
     </a>
 </div>
@@ -40,11 +40,11 @@
                             <span class="badge bg-primary">{{ lab.commitments|length }} cam kết</span>
                         </td>
                         <td>
-                            <a href="{{ url_for('labs_edit', lab_id=lab.id) }}"
+                            <a href="{{ url_for('labs.labs_edit', lab_id=lab.id) }}"
                                class="btn btn-sm btn-warning">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            <form method="POST" action="{{ url_for('labs_delete', lab_id=lab.id) }}"
+                            <form method="POST" action="{{ url_for('labs.labs_delete', lab_id=lab.id) }}"
                                   style="display: inline;"
                                   onsubmit="return confirm('Bạn có chắc muốn xóa Lab &quot;{{ lab.name }}&quot;?\nHành động này sẽ xóa tất cả cam kết liên quan!');">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>

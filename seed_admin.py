@@ -18,6 +18,9 @@ Usage (Linux / Mac):
 """
 import os
 import sys
+from werkzeug.security import generate_password_hash
+from app import create_app
+from app.models import db, User
 
 # Validate required env vars before importing app (which itself validates SECRET_KEY).
 admin_username = os.environ.get('ADMIN_USERNAME')
@@ -27,8 +30,7 @@ if not admin_username or not admin_password:
     print('[ERROR] ADMIN_USERNAME and ADMIN_PASSWORD must both be set in environment.')
     sys.exit(1)
 
-from app import app
-from models import db, User
+app = create_app()
 
 with app.app_context():
     if User.query.filter_by(username=admin_username).first():

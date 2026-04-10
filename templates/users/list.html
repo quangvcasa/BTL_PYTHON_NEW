@@ -6,7 +6,7 @@
     <h1 class="page-title">
         <i class="fas fa-users me-3"></i>Quản lý Users
     </h1>
-    <a href="{{ url_for('users_create') }}" class="btn btn-primary">
+    <a href="{{ url_for('users.users_create') }}" class="btn btn-primary">
         <i class="fas fa-user-plus me-2"></i>Thêm User mới
     </a>
 </div>
@@ -46,12 +46,12 @@
                             {% endif %}
                         </td>
                         <td>
-                            <a href="{{ url_for('users_edit', user_id=user.id) }}"
+                            <a href="{{ url_for('users.users_edit', user_id=user.id) }}"
                                class="btn btn-sm btn-warning">
                                 <i class="fas fa-edit"></i>
                             </a>
                             {% if user.id != current_user.id %}
-                            <form method="POST" action="{{ url_for('users_delete', user_id=user.id) }}"
+                            <form method="POST" action="{{ url_for('users.users_delete', user_id=user.id) }}"
                                   style="display: inline;"
                                   onsubmit="return confirm('Bạn có chắc muốn xóa user &quot;{{ user.username }}&quot;?');">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>

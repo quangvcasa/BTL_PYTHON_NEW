@@ -15,7 +15,7 @@
     {% if current_user.is_authenticated %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-ptit">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+            <a class="navbar-brand" href="{{ url_for('main.dashboard') }}">
                 <i class="fas fa-university me-2"></i>PTIT - Quản lý Lab
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -24,37 +24,37 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <a class="nav-link" href="{{ url_for('main.dashboard') }}">
                             <i class="fas fa-chart-line me-1"></i>Dashboard
                         </a>
                     </li>
                     {% if current_user.is_admin() %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('labs_list') }}">
+                        <a class="nav-link" href="{{ url_for('labs.labs_list') }}">
                             <i class="fas fa-flask me-1"></i>Labs
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('users_list') }}">
+                        <a class="nav-link" href="{{ url_for('users.users_list') }}">
                             <i class="fas fa-users me-1"></i>Users
                         </a>
                     </li>
                     {% endif %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('commitments_list') }}">
+                        <a class="nav-link" href="{{ url_for('commitments.commitments_list') }}">
                             <i class="fas fa-handshake me-1"></i>Cam kết
                         </a>
                     </li>
                     {% if not current_user.is_admin() %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('my_tasks') }}">
+                        <a class="nav-link" href="{{ url_for('main.my_tasks') }}">
                             <i class="fas fa-tasks me-1"></i>Task của tôi
                         </a>
                     </li>
                     {% endif %}
                     {% if current_user.is_admin() %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('reports') }}">
+                        <a class="nav-link" href="{{ url_for('reports.reports') }}">
                             <i class="fas fa-file-alt me-1"></i>Báo cáo
                         </a>
                     </li>
@@ -79,7 +79,7 @@
                                 {% endif %}
                             </span></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                            <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">
                                 <i class="fas fa-sign-out-alt me-2"></i>Đăng xuất
                             </a></li>
                         </ul>
