@@ -39,7 +39,13 @@ export ADMIN_USERNAME="myadmin"
 export ADMIN_PASSWORD="ChangeMe!2024"
 ```
 
-### 2. Create the first admin account
+### 2. Initialize the database
+
+```
+flask db upgrade
+```
+
+### 3. Create the first admin account
 
 ```
 python seed_admin.py
@@ -50,7 +56,7 @@ Output:
 Admin created: "myadmin"
 ```
 
-### 3. Start the app
+### 4. Start the app
 
 ```
 python app.py
@@ -84,5 +90,10 @@ python app.py
 - `seed_admin.py` — One-time admin creation helper
 - `templates/` — HTML templates
 - `static/` — CSS, JS
-- `instance/` — SQLite database file
-- `uploads/` — Uploaded attachments
+- `migrations/` — Database migration scripts
+
+### Local generated folders (Not tracked in Git)
+- `.venv/` — Python virtual environment
+- `instance/` — SQLite database file (created automatically)
+- `uploads/` — Uploaded attachments (created automatically)
+- `__pycache__/` — Python bytecode cache

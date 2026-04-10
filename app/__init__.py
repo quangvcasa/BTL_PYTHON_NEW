@@ -7,7 +7,8 @@ def create_app(config_class=Config):
     app = Flask(__name__, template_folder='../templates', static_folder='../static')
     app.config.from_object(config_class)
 
-    # Automatically create upload folder if not exists
+    # Automatically create instance and upload folders if not exists
+    os.makedirs(app.instance_path, exist_ok=True)
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
     # Initialize Flask extensions
