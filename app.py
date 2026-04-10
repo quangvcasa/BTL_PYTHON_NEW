@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import os
 import io
 import uuid
+import zipfile
 import filetype
 
 from config import Config
@@ -99,7 +100,7 @@ def validate_assigned_user(assigned_to_raw, lab_id):
 
 # ============== UPLOAD SECURITY ==============
 
-# Allowed file extensions and their expected MIME types (content-based).
+# Allowed file extensions mapped to their expected MIME types (content-based).
 # Only document/image types needed for progress attachments.
 ALLOWED_UPLOAD_EXTENSIONS = {
     'pdf':  'application/pdf',
@@ -109,14 +110,31 @@ ALLOWED_UPLOAD_EXTENSIONS = {
     'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 }
 
+# OOXML formats (docx, xlsx, pptx) are ZIP archives.  filetype.guess() returns
+# 'application/zip' for their magic bytes, not the full OOXML MIME.
+# This set lists extensions that need a secondary ZIP-entry verification.
+_ZIP_BASED_FORMATS = {
+    'docx': 'word/document.xml',
+}
+
+def _is_valid_ooxml(file_bytes, required_entry):
+    """Return True if file_bytes is a ZIP containing required_entry."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as zf:
+            return required_entry in zf.namelist()
+    except Exception:
+        return False
+
 def validate_uploaded_file(file):
     """Validate an uploaded FileStorage object.
 
     Checks (in order):
     1. File object exists and has a non-empty filename.
     2. Extension is in the allowlist.
-    3. Real MIME type (read from file bytes) matches the expected MIME for that extension.
-    4. Generates a safe, randomised storage filename.
+    3. Real MIME type is detected from file bytes (not filename/Content-Type).
+       - For standard types: filetype.guess() must match the expected MIME.
+       - For OOXML types (.docx): must be a valid ZIP containing the correct entry.
+    4. Generates a safe, randomised storage filename (UUID-based).
 
     Returns:
         (safe_filename: str, error_msg: str | None)
@@ -134,25 +152,36 @@ def validate_uploaded_file(file):
         allowed = ', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))
         return None, f'Loại file không được phép. Chỉ chấp nhận: {allowed}.'
 
-    # Read a header chunk to detect the real MIME type, then rewind.
-    header = file.read(2048)
+    # Read the whole file into memory for detection, then rewind so save() works.
+    file_bytes = file.read()
     file.seek(0)
 
-    try:
-        kind = filetype.guess(header)
-        detected_mime = kind.mime if kind else None
-    except Exception:
-        return None, 'Không thể xác định loại file. Vui lòng thử lại.'
+    if ext in _ZIP_BASED_FORMATS:
+        # OOXML formats share the PK/ZIP magic header.
+        # Verify by inspecting the ZIP central directory for the expected entry.
+        required_entry = _ZIP_BASED_FORMATS[ext]
+        if not _is_valid_ooxml(file_bytes, required_entry):
+            return None, (
+                f'File ".{ext}" không hợp lệ hoặc bị giả mạo '
+                f'(không tìm thấy đứng từ "{required_entry}" trong ZIP).'
+            )
+    else:
+        # For all other types, detect MIME from magic bytes.
+        try:
+            kind = filetype.guess(file_bytes[:2048])
+            detected_mime = kind.mime if kind else None
+        except Exception:
+            return None, 'Không thể xác định loại file. Vui lòng thử lại.'
 
-    if detected_mime is None:
-        return None, 'Không thể nhận diện loại file từ nội dung.'
+        if detected_mime is None:
+            return None, 'Không thể nhận diện loại file từ nội dung.'
 
-    expected_mime = ALLOWED_UPLOAD_EXTENSIONS[ext]
-    if detected_mime != expected_mime:
-        return None, (
-            f'Nội dung file không khớp với đuôi ".{ext}" '
-            f'(phát hiện: {detected_mime}).'
-        )
+        expected_mime = ALLOWED_UPLOAD_EXTENSIONS[ext]
+        if detected_mime != expected_mime:
+            return None, (
+                f'Nội dung file không khớp với đuôi ".{ext}" '
+                f'(phát hiện: {detected_mime}).'
+            )
 
     # Safe, unique storage name — never trust the original filename for storage.
     safe_filename = f"{uuid.uuid4().hex}.{ext}"
