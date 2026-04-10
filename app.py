@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, send_file
+from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, send_file, send_from_directory
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
@@ -474,6 +474,18 @@ def progress_update(commitment_id):
         return redirect(url_for('commitments_detail', commitment_id=commitment_id))
 
     return render_template('commitments/progress_form.html', commitment=commitment)
+
+# ============== FILE DOWNLOAD ROUTES ==============
+
+@app.route('/uploads/<filename>')
+@login_required
+def download_file(filename):
+    """Serve uploaded attachment files to authenticated users."""
+    return send_from_directory(
+        app.config['UPLOAD_FOLDER'],
+        filename,
+        as_attachment=True
+    )
 
 # ============== REPORT ROUTES ==============
 

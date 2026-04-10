@@ -108,6 +108,15 @@
                             <small class="text-muted">
                                 <i class="fas fa-user me-1"></i>{{ update.creator.username }}
                             </small>
+                            {% if update.attachment %}
+                            <div class="mt-2">
+                                <a href="{{ url_for('download_file', filename=update.attachment) }}"
+                                   class="btn btn-outline-secondary btn-sm"
+                                   title="Tải xuống tệp đính kèm">
+                                    <i class="fas fa-paperclip me-1"></i>{{ update.attachment.split('_', 1)[1] if '_' in update.attachment else update.attachment }}
+                                </a>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                     {% endfor %}
