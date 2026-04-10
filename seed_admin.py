@@ -1,14 +1,20 @@
-"""
+r"""
 seed_admin.py — Create the first admin user from environment variables.
 
-Usage (Windows):
-    set SECRET_KEY=<your-secret>
-    set ADMIN_USERNAME=<choose-a-username>
-    set ADMIN_PASSWORD=<choose-a-strong-password>
+Usage (Windows PowerShell):
+    $env:SECRET_KEY    = "your-secret"
+    $env:ADMIN_USERNAME = "myadmin"
+    $env:ADMIN_PASSWORD = "StrongPass!1"
     .venv\Scripts\python.exe seed_admin.py
 
-Usage (Linux/Mac):
-    SECRET_KEY=... ADMIN_USERNAME=... ADMIN_PASSWORD=... python seed_admin.py
+Usage (Windows CMD):
+    set SECRET_KEY=your-secret
+    set ADMIN_USERNAME=myadmin
+    set ADMIN_PASSWORD=StrongPass!1
+    .venv\Scripts\python.exe seed_admin.py
+
+Usage (Linux / Mac):
+    SECRET_KEY=your-secret ADMIN_USERNAME=myadmin ADMIN_PASSWORD=StrongPass!1 python seed_admin.py
 """
 import os
 import sys
