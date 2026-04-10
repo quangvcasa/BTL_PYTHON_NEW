@@ -106,7 +106,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         fetch(`/api/labs/${labId}/users`)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Users API returned ' + response.status);
+                }
+                return response.json();
+            })
             .then(users => {
                 userSelect.innerHTML = '<option value="">-- Chọn User (không bắt buộc) --</option>';
                 users.forEach(user => {

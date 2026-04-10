@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, send_file, send_from_directory
+from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, send_file, send_from_directory, abort
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
@@ -24,6 +24,75 @@ def load_user(user_id):
 
 # Create upload folder
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# ============== ACCESS CONTROL HELPERS ==============
+
+def can_access_lab(lab_id):
+    """Admin can access any lab; lab users only their own lab."""
+    if current_user.is_admin():
+        return True
+    return current_user.lab_id is not None and current_user.lab_id == lab_id
+
+def can_access_commitment(commitment):
+    """Admin can access any commitment; lab users only commitments of their lab."""
+    return can_access_lab(commitment.lab_id)
+
+# ============== VALIDATION HELPERS ==============
+
+ALLOWED_ROLES = {'admin', 'lab'}
+
+def parse_int_field(value, field_name):
+    """Parse an integer from a form string. Returns (int_value, error_str)."""
+    if value is None or str(value).strip() == '':
+        return None, f'Trường "{field_name}" không được để trống.'
+    try:
+        return int(str(value).strip()), None
+    except (ValueError, TypeError):
+        return None, f'Trường "{field_name}" phải là số nguyên hợp lệ.'
+
+def parse_date_field(value, field_name):
+    """Parse a date string (YYYY-MM-DD). Returns (date, error_str)."""
+    if not value or str(value).strip() == '':
+        return None, f'Trường "{field_name}" không được để trống.'
+    try:
+        return datetime.strptime(str(value).strip(), '%Y-%m-%d').date(), None
+    except (ValueError, TypeError):
+        return None, f'Trường "{field_name}" không đúng định dạng ngày (YYYY-MM-DD).'
+
+def validate_role(role):
+    """Ensure role is one of the allowed values. Returns error_str or None."""
+    if role not in ALLOWED_ROLES:
+        return f'Role không hợp lệ: "{role}". Chỉ chấp nhận: {', '.join(sorted(ALLOWED_ROLES))}.'
+    return None
+
+def validate_lab_id(lab_id_raw, required=True):
+    """Parse and validate lab_id exists in DB. Returns (int_or_None, error_str)."""
+    if lab_id_raw is None or str(lab_id_raw).strip() == '':
+        if required:
+            return None, 'Trường "lab_id" là bắt buộc.'
+        return None, None
+    lab_id, err = parse_int_field(lab_id_raw, 'lab_id')
+    if err:
+        return None, err
+    if not Lab.query.get(lab_id):
+        return None, f'Lab ID {lab_id} không tồn tại.'
+    return lab_id, None
+
+def validate_assigned_user(assigned_to_raw, lab_id):
+    """Validate assigned_to user exists and belongs to the given lab.
+    Returns (int_or_None, error_str)."""
+    raw = assigned_to_raw
+    if raw is None or str(raw).strip() == '':
+        return None, None  # optional field
+    user_id, err = parse_int_field(raw, 'assigned_to')
+    if err:
+        return None, err
+    user = User.query.get(user_id)
+    if not user:
+        return None, f'Người dùng ID {user_id} không tồn tại.'
+    if user.lab_id != lab_id:
+        return None, f'Người dùng "{user.username}" không thuộc lab này.'
+    return user_id, None
 
 # ============== AUTH ROUTES ==============
 
@@ -252,7 +321,19 @@ def users_create():
         username = request.form.get('username')
         password = request.form.get('password')
         role = request.form.get('role')
-        lab_id = request.form.get('lab_id') if role == 'lab' else None
+
+        # --- validate role ---
+        role_err = validate_role(role)
+        if role_err:
+            flash(role_err, 'danger')
+            return render_template('users/form.html', user=None, labs=labs, action='Tạo User mới')
+
+        # --- validate lab_id ---
+        lab_id_raw = request.form.get('lab_id') if role == 'lab' else None
+        lab_id, lab_err = validate_lab_id(lab_id_raw, required=(role == 'lab'))
+        if lab_err:
+            flash(lab_err, 'danger')
+            return render_template('users/form.html', user=None, labs=labs, action='Tạo User mới')
 
         if User.query.filter_by(username=username).first():
             flash('Tên đăng nhập đã tồn tại!', 'danger')
@@ -279,8 +360,23 @@ def users_edit(user_id):
     labs = Lab.query.all()
 
     if request.method == 'POST':
-        user.role = request.form.get('role')
-        user.lab_id = request.form.get('lab_id') if user.role == 'lab' else None
+        new_role = request.form.get('role')
+
+        # --- validate role ---
+        role_err = validate_role(new_role)
+        if role_err:
+            flash(role_err, 'danger')
+            return render_template('users/form.html', user=user, labs=labs, action='Chỉnh sửa User')
+
+        # --- validate lab_id ---
+        lab_id_raw = request.form.get('lab_id') if new_role == 'lab' else None
+        lab_id, lab_err = validate_lab_id(lab_id_raw, required=(new_role == 'lab'))
+        if lab_err:
+            flash(lab_err, 'danger')
+            return render_template('users/form.html', user=user, labs=labs, action='Chỉnh sửa User')
+
+        user.role = new_role
+        user.lab_id = lab_id
 
         new_password = request.form.get('password')
         if new_password:
@@ -353,10 +449,36 @@ def commitments_create():
     if request.method == 'POST':
         title = request.form.get('title')
         description = request.form.get('description')
-        lab_id = request.form.get('lab_id')
-        assigned_to = request.form.get('assigned_to') or None
-        start_date = datetime.strptime(request.form.get('start_date'), '%Y-%m-%d').date()
-        deadline = datetime.strptime(request.form.get('deadline'), '%Y-%m-%d').date()
+
+        # --- validate lab_id ---
+        lab_id, lab_err = validate_lab_id(request.form.get('lab_id'), required=True)
+        if lab_err:
+            flash(lab_err, 'danger')
+            return render_template('commitments/form.html', commitment=None, labs=labs,
+                                   lab_users=lab_users, action='Tạo Cam kết mới')
+
+        # --- validate dates ---
+        start_date, sd_err = parse_date_field(request.form.get('start_date'), 'Ngày bắt đầu')
+        if sd_err:
+            flash(sd_err, 'danger')
+            return render_template('commitments/form.html', commitment=None, labs=labs,
+                                   lab_users=lab_users, action='Tạo Cam kết mới')
+        deadline, dl_err = parse_date_field(request.form.get('deadline'), 'Ngày kết thúc')
+        if dl_err:
+            flash(dl_err, 'danger')
+            return render_template('commitments/form.html', commitment=None, labs=labs,
+                                   lab_users=lab_users, action='Tạo Cam kết mới')
+        if deadline < start_date:
+            flash('Ngày kết thúc không được nhỏ hơn ngày bắt đầu.', 'danger')
+            return render_template('commitments/form.html', commitment=None, labs=labs,
+                                   lab_users=lab_users, action='Tạo Cam kết mới')
+
+        # --- validate assigned_to ---
+        assigned_to, at_err = validate_assigned_user(request.form.get('assigned_to'), lab_id)
+        if at_err:
+            flash(at_err, 'danger')
+            return render_template('commitments/form.html', commitment=None, labs=labs,
+                                   lab_users=lab_users, action='Tạo Cam kết mới')
 
         commitment = Commitment(
             title=title,
@@ -391,12 +513,42 @@ def commitments_edit(commitment_id):
 
     if request.method == 'POST':
         if current_user.is_admin():
+            # --- validate lab_id ---
+            lab_id, lab_err = validate_lab_id(request.form.get('lab_id'), required=True)
+            if lab_err:
+                flash(lab_err, 'danger')
+                return render_template('commitments/form.html', commitment=commitment, labs=labs,
+                                       lab_users=lab_users, action='Chỉnh sửa Cam kết')
+
+            # --- validate dates ---
+            start_date, sd_err = parse_date_field(request.form.get('start_date'), 'Ngày bắt đầu')
+            if sd_err:
+                flash(sd_err, 'danger')
+                return render_template('commitments/form.html', commitment=commitment, labs=labs,
+                                       lab_users=lab_users, action='Chỉnh sửa Cam kết')
+            deadline, dl_err = parse_date_field(request.form.get('deadline'), 'Ngày kết thúc')
+            if dl_err:
+                flash(dl_err, 'danger')
+                return render_template('commitments/form.html', commitment=commitment, labs=labs,
+                                       lab_users=lab_users, action='Chỉnh sửa Cam kết')
+            if deadline < start_date:
+                flash('Ngày kết thúc không được nhỏ hơn ngày bắt đầu.', 'danger')
+                return render_template('commitments/form.html', commitment=commitment, labs=labs,
+                                       lab_users=lab_users, action='Chỉnh sửa Cam kết')
+
+            # --- validate assigned_to ---
+            assigned_to, at_err = validate_assigned_user(request.form.get('assigned_to'), lab_id)
+            if at_err:
+                flash(at_err, 'danger')
+                return render_template('commitments/form.html', commitment=commitment, labs=labs,
+                                       lab_users=lab_users, action='Chỉnh sửa Cam kết')
+
             commitment.title = request.form.get('title')
             commitment.description = request.form.get('description')
-            commitment.lab_id = request.form.get('lab_id')
-            commitment.assigned_to = request.form.get('assigned_to') or None
-            commitment.start_date = datetime.strptime(request.form.get('start_date'), '%Y-%m-%d').date()
-            commitment.deadline = datetime.strptime(request.form.get('deadline'), '%Y-%m-%d').date()
+            commitment.lab_id = lab_id
+            commitment.assigned_to = assigned_to
+            commitment.start_date = start_date
+            commitment.deadline = deadline
 
         db.session.commit()
         flash(f'Cam kết đã được cập nhật!', 'success')
@@ -441,7 +593,16 @@ def progress_update(commitment_id):
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
-        new_progress = int(request.form.get('progress'))
+        # --- validate progress ---
+        progress_raw = request.form.get('progress')
+        new_progress, prog_err = parse_int_field(progress_raw, 'progress')
+        if prog_err:
+            flash(prog_err, 'danger')
+            return render_template('commitments/progress_form.html', commitment=commitment)
+        if not (0 <= new_progress <= 100):
+            flash('Tiến độ phải nằm trong khoảng từ 0 đến 100.', 'danger')
+            return render_template('commitments/progress_form.html', commitment=commitment)
+
         notes = request.form.get('notes')
         attachment = None
 
@@ -480,7 +641,16 @@ def progress_update(commitment_id):
 @app.route('/uploads/<filename>')
 @login_required
 def download_file(filename):
-    """Serve uploaded attachment files to authenticated users."""
+    """Serve uploaded attachment files with ownership check."""
+    # Look up the file in DB — orphan files are not served
+    update = ProgressUpdate.query.filter_by(attachment=filename).first()
+    if update is None:
+        abort(404)
+
+    commitment = update.commitment
+    if not can_access_commitment(commitment):
+        abort(403)
+
     return send_from_directory(
         app.config['UPLOAD_FOLDER'],
         filename,
@@ -564,6 +734,10 @@ def api_stats():
 @login_required
 def api_timeline(commitment_id):
     commitment = Commitment.query.get_or_404(commitment_id)
+
+    if not can_access_commitment(commitment):
+        return jsonify({'success': False, 'message': 'Không có quyền truy cập'}), 403
+
     updates = ProgressUpdate.query.filter_by(commitment_id=commitment_id).order_by(ProgressUpdate.created_at).all()
 
     timeline = [{
@@ -582,7 +756,10 @@ def api_timeline(commitment_id):
 @app.route('/api/labs/<int:lab_id>/users')
 @login_required
 def api_lab_users(lab_id):
-    """Get all lab users for a specific lab"""
+    """Get all lab users for a specific lab (admin only)"""
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'message': 'Không có quyền truy cập'}), 403
+
     users = User.query.filter_by(lab_id=lab_id, role='lab').all()
     return jsonify([{'id': u.id, 'username': u.username} for u in users])
 
