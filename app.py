@@ -1,9 +1,12 @@
 from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, send_file, send_from_directory, abort
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import RequestEntityTooLarge
 from datetime import datetime, timedelta
 import os
 import io
+import uuid
+import filetype
 
 from config import Config
 from models import db, User, Lab, Commitment, ProgressUpdate
@@ -93,6 +96,67 @@ def validate_assigned_user(assigned_to_raw, lab_id):
     if user.lab_id != lab_id:
         return None, f'Người dùng "{user.username}" không thuộc lab này.'
     return user_id, None
+
+# ============== UPLOAD SECURITY ==============
+
+# Allowed file extensions and their expected MIME types (content-based).
+# Only document/image types needed for progress attachments.
+ALLOWED_UPLOAD_EXTENSIONS = {
+    'pdf':  'application/pdf',
+    'png':  'image/png',
+    'jpg':  'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+}
+
+def validate_uploaded_file(file):
+    """Validate an uploaded FileStorage object.
+
+    Checks (in order):
+    1. File object exists and has a non-empty filename.
+    2. Extension is in the allowlist.
+    3. Real MIME type (read from file bytes) matches the expected MIME for that extension.
+    4. Generates a safe, randomised storage filename.
+
+    Returns:
+        (safe_filename: str, error_msg: str | None)
+        If error_msg is not None the upload must be rejected.
+    """
+    if not file or not file.filename:
+        return None, None  # no file submitted — caller decides if required
+
+    original_name = secure_filename(file.filename)
+    if not original_name:
+        return None, 'Tên file không hợp lệ.'
+
+    ext = original_name.rsplit('.', 1)[-1].lower() if '.' in original_name else ''
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        allowed = ', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))
+        return None, f'Loại file không được phép. Chỉ chấp nhận: {allowed}.'
+
+    # Read a header chunk to detect the real MIME type, then rewind.
+    header = file.read(2048)
+    file.seek(0)
+
+    try:
+        kind = filetype.guess(header)
+        detected_mime = kind.mime if kind else None
+    except Exception:
+        return None, 'Không thể xác định loại file. Vui lòng thử lại.'
+
+    if detected_mime is None:
+        return None, 'Không thể nhận diện loại file từ nội dung.'
+
+    expected_mime = ALLOWED_UPLOAD_EXTENSIONS[ext]
+    if detected_mime != expected_mime:
+        return None, (
+            f'Nội dung file không khớp với đuôi ".{ext}" '
+            f'(phát hiện: {detected_mime}).'
+        )
+
+    # Safe, unique storage name — never trust the original filename for storage.
+    safe_filename = f"{uuid.uuid4().hex}.{ext}"
+    return safe_filename, None
 
 # ============== AUTH ROUTES ==============
 
@@ -606,15 +670,18 @@ def progress_update(commitment_id):
         notes = request.form.get('notes')
         attachment = None
 
-        # Handle file upload
+        # Handle file upload — validated before saving to disk.
         if 'attachment' in request.files:
             file = request.files['attachment']
             if file and file.filename:
-                filename = secure_filename(file.filename)
-                timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-                filename = f"{timestamp}_{filename}"
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                attachment = filename
+                safe_name, upload_err = validate_uploaded_file(file)
+                if upload_err:
+                    flash(upload_err, 'danger')
+                    return render_template('commitments/progress_form.html', commitment=commitment)
+                # Save only after validation passes; path traversal is impossible because
+                # safe_name is a UUID-based string with no path components.
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], safe_name))
+                attachment = safe_name
 
         # Create progress update record
         update = ProgressUpdate(
@@ -768,6 +835,12 @@ def api_lab_users(lab_id):
 @app.errorhandler(404)
 def not_found(error):
     return render_template('errors/404.html'), 404
+
+@app.errorhandler(RequestEntityTooLarge)
+def file_too_large(error):
+    """Handle uploads that exceed MAX_CONTENT_LENGTH before they reach route logic."""
+    flash('File quá lớn. Giới hạn tối đa là 16 MB.', 'danger')
+    return redirect(request.referrer or url_for('dashboard')), 413
 
 @app.errorhandler(500)
 def server_error(error):

@@ -9,5 +9,5 @@ class Config:
         'connect_args': {'check_same_thread': False}
     }
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max upload
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx'}
+    # Hard server-side upload size limit; Flask rejects larger requests with 413.
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
