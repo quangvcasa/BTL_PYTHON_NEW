@@ -1,5 +1,7 @@
 from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, send_file, send_from_directory, abort
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_wtf import CSRFProtect
+from flask_wtf.csrf import CSRFError
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 from datetime import datetime, timedelta
@@ -16,6 +18,7 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 # Initialize extensions
+csrf = CSRFProtect(app)  # CSRF protection for all state-changing requests
 db.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -860,6 +863,12 @@ def api_lab_users(lab_id):
     return jsonify([{'id': u.id, 'username': u.username} for u in users])
 
 # ============== ERROR HANDLERS ==============
+
+@app.errorhandler(CSRFError)
+def csrf_error(error):
+    """Return a friendly error when a CSRF token is missing or invalid."""
+    flash('Yêu cầu không hợp lệ: CSRF token thiếu hoặc đã hết hạn. Vui lòng thử lại.', 'danger')
+    return redirect(request.referrer or url_for('dashboard'))
 
 @app.errorhandler(404)
 def not_found(error):

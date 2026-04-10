@@ -19,6 +19,7 @@
             </div>
             <div class="card-body">
                 <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     {% if current_user.is_admin() %}
                     <div class="mb-3">
                         <label for="lab_id" class="form-label">Lab thực hiện <span class="text-danger">*</span></label>
