@@ -5,55 +5,84 @@ A Flask application for managing lab progress and commitments using Flask + SQLi
 ## Prerequisites
 
 - Python 3.10+
-- Windows/Linux/Mac
+- Windows / Linux / Mac
 
 ## Installation
 
-1. Clone the repository
-2. Create virtual environment:
+1. Clone the repository.
+2. Create a virtual environment:
    ```
    python -m venv .venv
-   .venv\Scripts\activate  # On Windows
+   .venv\Scripts\activate      # Windows
+   source .venv/bin/activate   # Linux / Mac
    ```
 3. Install dependencies:
    ```
    pip install -r requirements.txt
    ```
 
-## Running the Application
+## Running locally (demo)
 
-The database and default admin user will be created automatically on first run.
+### 1. Set required environment variables
 
-Set environment variables and run:
+**Windows (PowerShell):**
+```powershell
+$env:SECRET_KEY    = (python -c "import secrets; print(secrets.token_hex(32))")
+$env:ADMIN_USERNAME = "myadmin"
+$env:ADMIN_PASSWORD = "ChangeMe!2024"
+```
+
+**Linux / Mac:**
+```bash
+export SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+export ADMIN_USERNAME="myadmin"
+export ADMIN_PASSWORD="ChangeMe!2024"
+```
+
+### 2. Create the first admin account
 
 ```
-set FLASK_APP=app.py
-set FLASK_ENV=development
-flask run --host=0.0.0.0 --port=5000
+python seed_admin.py
 ```
 
-Or simply:
+Output:
+```
+Admin created: "myadmin"
+```
+
+### 3. Start the app
 
 ```
 python app.py
 ```
 
-Access at http://127.0.0.1:5000/
+Access at http://127.0.0.1:5000/ and log in with the credentials you chose above.
 
-## Default Credentials
+### Enable debug mode (optional, local dev only)
 
-- Admin: admin / admin123
+```powershell
+$env:FLASK_DEBUG = "1"
+python app.py
+```
 
-## Configuration
+> ⚠️ Never run with `FLASK_DEBUG=1` in production.
 
-- `config.py`: Contains SECRET_KEY, SQLALCHEMY_DATABASE_URI (SQLite file: instance/ptit_lab_progress.db), UPLOAD_FOLDER (uploads/)
+## Configuration reference
+
+| Variable        | Required | Description                                      |
+|-----------------|----------|--------------------------------------------------|
+| `SECRET_KEY`    | ✅ Yes   | Flask session signing key (generate fresh each time) |
+| `ADMIN_USERNAME`| For seed | Username for the first admin account             |
+| `ADMIN_PASSWORD`| For seed | Password for the first admin account             |
+| `FLASK_DEBUG`   | No       | Set to `1` to enable debug mode (default: off)   |
 
 ## Project Structure
 
-- `app.py`: Main application file
-- `models.py`: Database models
-- `config.py`: Configuration
-- `templates/`: HTML templates
-- `static/`: CSS, JS files
-- `instance/`: Database file
-- `uploads/`: Uploaded files
+- `app.py` — Main application
+- `models.py` — Database models
+- `config.py` — Configuration (reads from environment)
+- `seed_admin.py` — One-time admin creation helper
+- `templates/` — HTML templates
+- `static/` — CSS, JS
+- `instance/` — SQLite database file
+- `uploads/` — Uploaded attachments

@@ -902,13 +902,22 @@ def init_db():
         db.create_all()
         ensure_commitments_assigned_to_column()
 
-        # Check if admin exists
-        if not User.query.filter_by(username='admin').first():
-            admin = User(username='admin', role='admin')
-            admin.set_password('admin123')
-            db.session.add(admin)
-            db.session.commit()
-            print('Default admin user created: admin / admin123')
+        # Create admin from environment variables only — never from hardcoded defaults.
+        admin_username = os.environ.get('ADMIN_USERNAME')
+        admin_password = os.environ.get('ADMIN_PASSWORD')
+        if admin_username and admin_password:
+            if not User.query.filter_by(username=admin_username).first():
+                admin = User(username=admin_username, role='admin')
+                admin.set_password(admin_password)
+                db.session.add(admin)
+                db.session.commit()
+                print(f'Admin user "{admin_username}" created.')
+            else:
+                print(f'Admin user "{admin_username}" already exists, skipping.')
+        else:
+            # No credentials supplied — skip auto-creation silently.
+            # Use seed_admin.py to create the first admin manually.
+            pass
 
         # Create sample labs if none exist
         if Lab.query.count() == 0:
@@ -929,4 +938,5 @@ with app.app_context():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    debug = os.environ.get('FLASK_DEBUG', '0') == '1'
+    app.run(debug=debug, host='0.0.0.0', port=5000)
